@@ -104,5 +104,49 @@ func TestIDNASeparators(t *testing.T) {
 	}
 }
 
-// TODO(nigeltao): test errors, once we've specified when ToASCII and ToUnicode
-// return errors.
+func TestIDNAErrors(t *testing.T) {
+	for _, tc := range []string{
+		"xn--example-.com",
+	} {
+		if got, err := ToASCII(tc); err == nil {
+			t.Errorf("ToASCII(%q) = %q, want error", tc, got)
+		}
+		if got, err := ToUnicode(tc); err == nil {
+			t.Errorf("ToUnicode(%q) = %q, want error", tc, got)
+		}
+	}
+}
+
+// TestIDNAErrorsASCIIPunycodeProfiles checks that every predefined profile
+// rejects xn-- labels which decode to an all-ASCII label, so that distinct
+// ASCII names (e.g. "xn--example-.com") can't map onto another name
+// (e.g. "example.com").
+func TestIDNAErrorsASCIIPunycodeProfiles(t *testing.T) {
+	profiles := []struct {
+		name    string
+		profile *Profile
+	}{
+		{"Punycode", Punycode},
+		{"Lookup", Lookup},
+		{"Display", Display},
+		{"Registration", Registration},
+	}
+	inputs := []string{
+		"xn--example-.com",
+		"www.xn--example-.com",
+		"example.xn--com-",
+		"xn--golang-.xn--org-",
+	}
+	for _, p := range profiles {
+		t.Run(p.name, func(t *testing.T) {
+			for _, tc := range inputs {
+				if got, err := p.profile.ToASCII(tc); err == nil {
+					t.Errorf("%s.ToASCII(%q) = %q, want error", p.name, tc, got)
+				}
+				if got, err := p.profile.ToUnicode(tc); err == nil {
+					t.Errorf("%s.ToUnicode(%q) = %q, want error", p.name, tc, got)
+				}
+			}
+		})
+	}
+}

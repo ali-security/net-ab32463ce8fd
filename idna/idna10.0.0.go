@@ -362,13 +362,21 @@ func (p *Profile) process(s string, toASCII bool) (string, error) {
 			continue
 		}
 		if strings.HasPrefix(label, acePrefix) {
-			u, err2 := decode(label[len(acePrefix):])
+			enc := label[len(acePrefix):]
+			u, err2 := decode(enc)
 			if err2 != nil {
 				if err == nil {
 					err = err2
 				}
 				// Spec says keep the old label.
 				continue
+			}
+			if err == nil && len(u) > 0 && ascii(u) {
+				// UTS 43 pre-revision 33 doesn't classify a xn-- label
+				// which contains only ASCII characters as an error,
+				// but that's a specification bug and a security issue.
+				// Always return an error in this case.
+				err = punyError(enc)
 			}
 			isBidi = isBidi || bidirule.DirectionString(u) != bidi.LeftToRight
 			labels.set(u)
